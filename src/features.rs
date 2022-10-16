@@ -1,21 +1,26 @@
-use color_eyre::Result;
+use color_eyre::{eyre::ContextCompat, Result};
+use flate2::{bufread::GzEncoder, Compression};
 use rand::Rng;
+use serde::Serialize;
 use std::{
     fs::File,
-    io::{BufReader, Read, Seek},
+    io::{BufReader, Read, Seek, SeekFrom},
+    path::Path,
 };
 
 /// The number of bytes to include in the header feature.
-const HEADER_SIZE: usize = 8;
+pub const HEADER_SIZE: usize = 8;
 
 /// The number of bytes to include in the random_bytes feature.
-const RANDOM_BYTES_SIZE: usize = 64;
+pub const RANDOM_BYTES_SIZE: usize = 32;
 
+#[derive(Debug, Serialize)]
 pub struct Features {
     file_name: String,
     entropy: f32,
     header: [u8; HEADER_SIZE],
     random_bytes: [u8; RANDOM_BYTES_SIZE],
+    compression_ratio: f32,
 }
 
 impl Features {
@@ -24,27 +29,50 @@ impl Features {
         entropy: f32,
         header: [u8; HEADER_SIZE],
         random_bytes: [u8; RANDOM_BYTES_SIZE],
+        compression_ratio: f32,
     ) -> Self {
         Self {
             file_name,
             entropy,
             header,
             random_bytes,
+            compression_ratio,
         }
     }
 }
 
-pub fn get_features(file_name: &str, file: &File) -> Result<Features> {
+pub fn get_features(file_name: &Path, file: &File) -> Result<Features> {
     let entropy = get_entropy(file)?;
     let header = get_header(file)?;
     let random_bytes = get_random_bytes(file)?;
+    let compression_ratio = get_compression_ratio(file)?;
 
     Ok(Features::new(
-        file_name.to_owned(),
+        file_name
+            .to_str()
+            .with_context(|| "Could not get file name")?
+            .to_string(),
         entropy,
         header,
         random_bytes,
+        compression_ratio,
     ))
+}
+
+fn get_compression_ratio(file: &File) -> Result<f32> {
+    // man gzip says the default level is 6
+    let mut gz_encoder = GzEncoder::new(BufReader::new(file), Compression::new(6));
+
+    let mut buffer = Vec::new();
+    gz_encoder.read_to_end(&mut buffer)?;
+
+    let orig_len = file.metadata()?.len() as f32;
+    let compress_len = buffer.len() as f32;
+
+    // return the compression ratio
+    let ratio = 1f32 - (compress_len / orig_len);
+
+    Ok(ratio)
 }
 
 fn get_random_bytes(file: &File) -> Result<[u8; RANDOM_BYTES_SIZE]> {
@@ -58,11 +86,11 @@ fn get_random_bytes(file: &File) -> Result<[u8; RANDOM_BYTES_SIZE]> {
     let mut rng = rand::thread_rng();
     let mut buf = [0; 1];
 
-    for i in 0..RANDOM_BYTES_SIZE {
+    for i in random_bytes.iter_mut() {
         let pos = rng.gen_range(0..len);
-        reader.seek(std::io::SeekFrom::Start(pos))?;
+        reader.seek(SeekFrom::Start(pos))?;
         reader.read_exact(&mut buf)?;
-        random_bytes[i] = buf[0];
+        *i = buf[0];
     }
 
     Ok(random_bytes)
@@ -72,7 +100,8 @@ fn get_random_bytes(file: &File) -> Result<[u8; RANDOM_BYTES_SIZE]> {
 fn get_header(file: &File) -> Result<[u8; HEADER_SIZE]> {
     let mut header = [0; HEADER_SIZE];
     let mut reader = BufReader::with_capacity(HEADER_SIZE, file);
-    reader.read_exact(&mut header)?;
+    reader.seek(SeekFrom::Start(0))?;
+    let _ = reader.read(&mut header)?;
 
     Ok(header)
 }
