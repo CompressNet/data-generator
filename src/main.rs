@@ -43,7 +43,9 @@ fn main() -> Result<()> {
     }
 
     let files: Vec<PathBuf> = fs::read_dir(&args.input_directory)?
-        .map(|entry| entry.unwrap().path())
+        .map(|entry| entry.unwrap())
+        .filter(|entry| entry.file_type().unwrap().is_file())
+        .map(|entry| entry.path())
         .collect::<Vec<_>>();
 
     let pb = create_progress_bar(files.len() as u64)?;
@@ -53,7 +55,7 @@ fn main() -> Result<()> {
         .par_iter()
         .progress_with(pb)
         .map(|file_path| {
-            let file = File::open(file_path).unwrap();
+            let file = fs::read(file_path).unwrap();
             get_features(file_path, &file)
         })
         .collect::<Result<Vec<Features>>>()?;
