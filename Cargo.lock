@@ -118,7 +118,11 @@ dependencies = [
 
 [[package]]
 name = "cn-data-generator"
+<<<<<<< HEAD
 version = "0.1.1"
+=======
+version = "0.3.0"
+>>>>>>> fa7b055 (add file size & compression time)
 dependencies = [
  "clap",
  "color-eyre",

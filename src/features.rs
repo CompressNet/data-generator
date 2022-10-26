@@ -2,7 +2,15 @@ use color_eyre::{eyre::ContextCompat, Result};
 use flate2::{bufread::GzEncoder, Compression};
 use rand::Rng;
 use serde::Serialize;
+<<<<<<< HEAD
 use std::{io::Read, path::Path};
+=======
+use std::{
+    fs::File,
+    io::{BufReader, Read, Seek, SeekFrom},
+    path::Path, time::Duration,
+};
+>>>>>>> fa7b055 (add file size & compression time)
 
 /// The number of bytes to include in the header feature.
 pub const HEADER_SIZE: usize = 8;
@@ -13,25 +21,31 @@ pub const RANDOM_BYTES_SIZE: usize = 32;
 #[derive(Debug, Serialize)]
 pub struct Features {
     file_name: String,
+    file_size: u64,
     entropy: f32,
     header: [u8; HEADER_SIZE],
     random_bytes: [u8; RANDOM_BYTES_SIZE],
+    compress_time_ms: u128 ,
     compression_ratio: f32,
 }
 
 impl Features {
     pub fn new(
         file_name: String,
+        file_size: u64,
         entropy: f32,
         header: [u8; HEADER_SIZE],
         random_bytes: [u8; RANDOM_BYTES_SIZE],
+        compress_time_ms: u128 ,
         compression_ratio: f32,
     ) -> Self {
         Self {
             file_name,
+            file_size,
             entropy,
             header,
             random_bytes,
+            compress_time_ms,
             compression_ratio,
         }
     }
@@ -39,36 +53,51 @@ impl Features {
 
 pub fn get_features(file_name: &Path, file: &[u8]) -> Result<Features> {
     let entropy = get_entropy(file)?;
+    let file_sz = file.metadata()?.len();
     let header = get_header(file)?;
     let random_bytes = get_random_bytes(file)?;
-    let compression_ratio = get_compression_ratio(file)?;
+    let (compress_time, compression_ratio) = get_compression_ratio_and_time(file)?;
 
     Ok(Features::new(
         file_name
             .to_str()
             .with_context(|| "Could not get file name")?
             .to_string(),
+        file_sz,
         entropy,
         header,
         random_bytes,
+        compress_time.as_millis(),
         compression_ratio,
     ))
 }
 
+<<<<<<< HEAD
 fn get_compression_ratio(file: &[u8]) -> Result<f32> {
+=======
+fn get_compression_ratio_and_time(file: &File) -> Result<(Duration, f32)> {
+    let start_time = std::time::Instant::now();
+
+>>>>>>> fa7b055 (add file size & compression time)
     // man gzip says the default level is 6
     let mut gz_encoder = GzEncoder::new(file, Compression::new(6));
 
     let mut buffer = Vec::new();
     gz_encoder.read_to_end(&mut buffer)?;
 
+<<<<<<< HEAD
     let orig_len = file.len() as f32;
+=======
+    let end_time = std::time::Instant::now();
+
+    let orig_len = file.metadata()?.len() as f32;
+>>>>>>> fa7b055 (add file size & compression time)
     let compress_len = buffer.len() as f32;
 
     // return the compression ratio
     let ratio = 1f32 - (compress_len / orig_len);
 
-    Ok(ratio)
+    Ok((end_time - start_time, ratio))
 }
 
 fn get_random_bytes(file: &[u8]) -> Result<[u8; RANDOM_BYTES_SIZE]> {

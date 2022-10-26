@@ -82,6 +82,7 @@ fn write_header(writer: &mut csv::Writer<File>) -> Result<()> {
     let mut header = Vec::new();
 
     header.push("file_name".to_owned());
+    header.push("file_size".to_owned());
     header.push("entropy".to_owned());
 
     // header 1-8
@@ -94,6 +95,7 @@ fn write_header(writer: &mut csv::Writer<File>) -> Result<()> {
         header.push(format!("random_byte_{}", i));
     }
 
+    header.push("compress_time_ms".to_owned());
     header.push("compression_ratio".to_owned());
 
     writer.write_record(&header)?;
