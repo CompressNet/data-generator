@@ -2,11 +2,7 @@ use color_eyre::{eyre::ContextCompat, Result};
 use flate2::{bufread::GzEncoder, Compression};
 use rand::Rng;
 use serde::Serialize;
-use std::{
-    fs::File,
-    io::{BufReader, Read, Seek, SeekFrom},
-    path::Path, time::Duration,
-};
+use std::{io::Read, path::Path, time::Duration};
 
 /// The number of bytes to include in the header feature.
 pub const HEADER_SIZE: usize = 8;
@@ -21,7 +17,7 @@ pub struct Features {
     entropy: f32,
     header: [u8; HEADER_SIZE],
     random_bytes: [u8; RANDOM_BYTES_SIZE],
-    compress_time_ms: u128 ,
+    compress_time_ms: u128,
     compression_ratio: f32,
 }
 
@@ -32,7 +28,7 @@ impl Features {
         entropy: f32,
         header: [u8; HEADER_SIZE],
         random_bytes: [u8; RANDOM_BYTES_SIZE],
-        compress_time_ms: u128 ,
+        compress_time_ms: u128,
         compression_ratio: f32,
     ) -> Self {
         Self {
@@ -49,7 +45,7 @@ impl Features {
 
 pub fn get_features(file_name: &Path, file: &[u8]) -> Result<Features> {
     let entropy = get_entropy(file)?;
-    let file_sz = file.metadata()?.len();
+    let file_sz = file.len() as u64;
     let header = get_header(file)?;
     let random_bytes = get_random_bytes(file)?;
     let (compress_time, compression_ratio) = get_compression_ratio_and_time(file)?;
@@ -68,7 +64,7 @@ pub fn get_features(file_name: &Path, file: &[u8]) -> Result<Features> {
     ))
 }
 
-fn get_compression_ratio_and_time(file: &File) -> Result<(Duration, f32)> {
+fn get_compression_ratio_and_time(file: &[u8]) -> Result<(Duration, f32)> {
     let start_time = std::time::Instant::now();
 
     // man gzip says the default level is 6
@@ -79,7 +75,7 @@ fn get_compression_ratio_and_time(file: &File) -> Result<(Duration, f32)> {
 
     let end_time = std::time::Instant::now();
 
-    let orig_len = file.metadata()?.len() as f32;
+    let orig_len = file.len() as f32;
     let compress_len = buffer.len() as f32;
 
     // return the compression ratio
